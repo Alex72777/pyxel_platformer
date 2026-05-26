@@ -6,6 +6,8 @@ class App:
         pyxel.init(128, 128, title="Jumpy", fps=60)
         pyxel.load("assets.pyxres")
         self.player = Player(64, 0, 16, 16, 0, 8)
+        self.cam_x = self.player.x
+        self.cam_y = self.player.y
 
         pyxel.run(self.update, self.draw)
 
@@ -36,11 +38,13 @@ class Player:
         self.v = v
         self.vel_x = 0
         self.vel_y = 0
+        self.dir_x = 1
         self.in_air = False
         self.crouching = False
         self.crouch_frame = 0
         self.jump_power = 6
         self.movement_speed = 3
+        self.crouch_height = 7
 
     def update(self) -> None:
         #print(self.x, self.y, self.vel_y)
@@ -50,13 +54,13 @@ class Player:
         if self.vel_y < 0:
             self.vel_y = min(0, self.vel_y + GRAVITY_STRENGTH)
 
-        if self.y < 64:
+        if self.y < pyxel.height - self.h:
             self.in_air = True
             self.vel_y = min(self.jump_power, self.vel_y + GRAVITY_STRENGTH)
         else:
             self.in_air = False
 
-        if pyxel.btnp(pyxel.KEY_S) and not self.in_air:
+        if pyxel.btn(pyxel.KEY_S) and not self.in_air and not self.crouching:
             self.crouch_frame = pyxel.frame_count
             self.crouching = True
         if pyxel.btnr(pyxel.KEY_S) and not self.in_air:
@@ -72,15 +76,17 @@ class Player:
         self.x += self.vel_x * vel_x_multiplier
         self.x = max(0, self.x)
         self.x = min(pyxel.width - self.w, self.x)
-        self.y = min(self.y + self.vel_y, 64)
+        self.y = min(self.y + self.vel_y, pyxel.height - self.h)
 
-        if self.y == 64:
+        if self.y == pyxel.height - self.h:
             self.vel_y = 0
 
         if pyxel.btn(pyxel.KEY_Q):
             self.vel_x = -self.movement_speed
+            self.dir_x = -1
         if pyxel.btn(pyxel.KEY_D):
             self.vel_x = self.movement_speed
+            self.dir_x = 1
         if pyxel.btn(pyxel.KEY_SPACE) and not self.in_air:
             self.vel_y = -self.jump_power
 
@@ -90,16 +96,21 @@ class Player:
         offset_u = 0
         if self.vel_x > 0:
             offset_u = (pyxel.frame_count // 8 % 4) * 16
-
-        if self.vel_x < 0:
+        elif self.vel_x < 0:
             offset_u = 64 + (pyxel.frame_count // 8 % 4) * 16
+        else:
+            if self.dir_x == 1:
+                offset_u = 0
+            elif self.dir_x == -1:
+                offset_u = 64
 
-        if self.vel_y != 0 and self.vel_x >= 0:
+
+        if self.vel_y != 0 and self.dir_x == 1:
             if self.vel_y > 2.5:
                 offset_u = 48
             else:
                 offset_u = 32
-        elif self.vel_y != 0 and self.vel_x < 0:
+        elif self.vel_y != 0 and self.dir_x == -1:
             if self.vel_y > 2.5:
                 offset_u = 80
             else:
@@ -107,11 +118,10 @@ class Player:
 
         if self.crouching:
             v = 40
-            if self.vel_x >= 0:
+            if self.dir_x == 1:
                 offset_u = min(3, (pyxel.frame_count - self.crouch_frame) // 8) * 16
-            else:
+            elif self.dir_x == -1:
                 offset_u = 64 + min(3, (pyxel.frame_count - self.crouch_frame) // 8) * 16
-
 
         u += offset_u
         #print(u, v, self.crouching)
